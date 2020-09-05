@@ -1,5 +1,7 @@
 ---
 title: "R Notebook"
+author: "John Kellogg"
+date: "9/5/2020"
 output:
   html_document: default
   html_notebook: default
@@ -7,15 +9,19 @@ output:
 
 **Principles of Data Visualization and Introduction to ggplot2**
 
-I have provided you with data about the 5,000 fastest growing companies in the US, as compiled by Inc. magazine. lets read this in:
+#### I have provided you with data about the 5,000 fastest growing companies in the US, as compiled by Inc. magazine. Lets read this in:
 
-```{r}
+```{r, echo=FALSE, message=FALSE}
 
 inc <- read.csv("https://raw.githubusercontent.com/charleyferrari/CUNY_DATA_608/master/module1/Data/inc5000_data.csv", header= TRUE)
 
+library(tidyverse)
+library(knitr)
+
+options(scipen=999)
 ```
 
-And lets preview this data:
+#### And lets preview this data:
 
 ```{r}
 
@@ -28,41 +34,191 @@ summary(inc)
 
 ```
 
-Think a bit on what these summaries mean. Use the space below to add some more relevant non-visual exploratory information you think helps you understand this data:
+#### Think a bit on what these summaries mean. Use the space below to add some more relevant non-visual exploratory information you think helps you understand this data:
 
+First off, how many states are included in this data?  If it's less than 50, which states are not part of the data; more than 50, which of the territories are part of this data?  
 ```{r}
-
-# Insert your code here, create more chunks as necessary
-
+inc$State %>% unique() %>% length()
 ```
+52 is more than the conventional US states.  Lets see which one is extra from the standard states.
+```{r}
+inc$State %>% unique()
+```
+* PR =  Puerto Rico  
+* DC = District of Columbia  
+  
+Unfortunately, most people do not realize the District of Columbia does not fall into any state as it's federal land.
+  
+```{r}
+filter(inc, State == "PR")
+```
+Puerto Rico has only one company as part of this data.  No useful insights can be gained.  
+  
+```{r}
+dc_stats<- filter(inc, State == "DC")
+summary(dc_stats)
+```
+Business Products and Government Services make sense for DC businesses.  A large about of them are focused on federal and state governments.  There is a discrepancy on the Growth Rate.  The 3rd QR is 6.525, however, the max is 123.33.  This would generate a heavy skew to the rate.
+
+Another item of note, the data does not appear to be completely clean, mostly likely human error.  The City column has 3 different ways to spell Washington, DC.  If any analysis is going to happen on the cities of this dataset, a cleaning will need to happen.
+  
+Focusing back on the dataset,  the same item pops out of the total summary numbers.    
+```{r}
+summary(inc$Growth_Rate)
+```
+Growth Rate, even without plotting any item, shows heavy skew much like DC.  
+The 3rd qr numbers are 3.290 however the Max number is 421.480.  
+```{r}
+inc %>% count(Growth_Rate > 3.291)
+```
+33% of the businesses are above the 3rd QR range.  
 
 ## Question 1
 
-Create a graph that shows the distribution of companies in the dataset by State (ie how many are in each state). There are a lot of States, so consider which axis you should use. This visualization is ultimately going to be consumed on a 'portrait' oriented screen (ie taller than wide), which should further guide your layout choices.
+#### Create a graph that shows the distribution of companies in the dataset by State (ie how many are in each state). There are a lot of States, so consider which axis you should use. This visualization is ultimately going to be consumed on a 'portrait' oriented screen (ie taller than wide), which should further guide your layout choices.
 
 ```{r}
+q1 <- inc%>%
+  group_by(State)%>%
+  count(State)%>%
+  arrange(desc(n))%>%
+  as_tibble(q1)
+  
+ggplot(q1, aes(x=reorder(State,n), y=n))+
+  geom_bar(stat="identity", width=.6)+
+  theme(axis.title=element_blank())+
+  geom_hline(yintercept=seq(1,800,100), col="white", lwd=1)+
+  theme(panel.grid.major.y = element_blank())+
+  theme_classic()+
+  coord_flip()+
+  xlab("State")+
+  ylab("Number of Fastest Growing Companies")
 
-# Answer Question 1 here
 
 ```
 
-## Quesiton 2
+The Bar chart is chosen for it's clean representation of the data.  It's easily read and quickly understood.  I chose to not use color on most of these plots.  I am not comparing data point to another where I would need to have the same color running through the report.  
 
-Lets dig in on the state with the 3rd most companies in the data set. Imagine you work for the state and are interested in how many people are employed by companies in different industries. Create a plot that shows the average and/or median employment by industry for companies in this state (only use cases with full data, use R's `complete.cases()` function.) In addition to this, your graph should show how variable the ranges are, and you should deal with outliers.
+## Question 2
+
+#### Lets dig in on the state with the 3rd most companies in the data set. Imagine you work for the state and are interested in how many people are employed by companies in different industries. Create a plot that shows the average and/or median employment by industry for companies in this state (only use cases with full data, use R's `complete.cases()` function.) In addition to this, your graph should show how variable the ranges are, and you should deal with outliers.
 
 ```{r}
-
-# Answer Question 2 here
-
+# finding the state in question
+q1[3,"State"]
+```
+How does NY compare to the country as a whole?
+```{r}
+summary(inc)
+```
+```{r}
+#comparing NY to the country
+ny_stats<- filter(inc, State == "NY")
+summary(ny_stats)
 ```
 
+
+```{r}
+q2 <- ny_stats%>%
+  filter(complete.cases(.))%>%
+  group_by(Industry)%>%
+  summarise(Industry_Mean = mean(Employees),
+            Industry_Median = median(Employees))%>%
+  gather(statistic, Employees, Industry_Mean, Industry_Median)
+
+ggplot(q2, aes(x=Industry, y=Employees))+
+  geom_bar(stat = "identity", aes(fill=statistic))+
+  geom_hline(yintercept=seq(1,1600,100), col="white", lwd=1)+
+  theme_classic()+
+  coord_flip()+
+  ggtitle("NY Mean/Median by Industry")
+```
+```{r, echo=FALSE}
+q2_total <- inc%>%
+  filter(complete.cases(.))%>%
+  group_by(Industry)%>%
+  summarise(Industry_Mean = mean(Employees),
+            Industry_Median = median(Employees))%>%
+  gather(statistic, Employees, Industry_Mean, Industry_Median)
+
+ggplot(q2_total, aes(x=Industry, y=Employees))+
+  geom_bar(stat = "identity", aes(fill=statistic))+
+  geom_hline(yintercept=seq(1,1600,100), col="white", lwd=1)+
+  theme_classic()+
+  coord_flip()+
+  ggtitle("Country Mean/Median by Industry")
+
+```
+  
+```{r}
+q2_bar <- ny_stats %>%
+  filter(complete.cases(.))%>%
+  select(Industry, Employees)
+
+
+ggplot(q2_bar, aes(x=Employees, y=reorder(Industry, Employees, median, order = TRUE)))+
+  geom_boxplot(fill="slateblue", alpha=0.2)+
+  scale_x_log10()+
+  theme_classic()+
+  ylab("Industry (by median)")+
+  ggtitle("NY Median by Industry")
+```
+```{r, echo=FALSE}
+q2_bar_total <- inc %>%
+  filter(complete.cases(.))%>%
+  select(Industry, Employees)
+
+ggplot(q2_bar_total, aes(x=Employees, y=reorder(Industry, Employees, median, order = TRUE)))+
+  geom_boxplot(fill="slateblue", alpha=0.2)+
+  scale_x_log10()+
+  theme_classic()+
+  ylab("Industry (by median)")+
+  ggtitle("Country Median by Industry")
+
+#ggplot(q2_bar_total, aes(x=Employees, y=reorder(Industry, Employees, median, order = TRUE)))+
+
+```
+  
+I wanted to present the data in two different ways and give a comparison between the requested value and the data as a whole.   
+  
+The bar charts give, again, clean representation of the data. I chose to allow color as there is two items on the same charts and wanted a clear delineation between the values in both B/w and color display.  
+  
+The Box plot displays the same data, however, given the median value graphically in the form of the line tells the story of the data easier.  
+  
 ## Question 3
 
-Now imagine you work for an investor and want to see which industries generate the most revenue per employee. Create a chart that makes this information clear. Once again, the distribution per industry should be shown.
+#### Now imagine you work for an investor and want to see which industries generate the most revenue per employee. Create a chart that makes this information clear. Once again, the distribution per industry should be shown.
 
 ```{r}
 
-# Answer Question 3 here
+q3 <- ny_stats%>%
+  filter(complete.cases(.))%>%
+  group_by(Industry)%>%
+  summarise(Revenue_total = sum(Revenue), Employees_Total= sum(Employees))%>%
+  mutate(Revenue_per_employee = Revenue_total/Employees_Total)
+
+ggplot(q3, aes(x=reorder(Industry, Revenue_per_employee), y=Revenue_per_employee))+
+  geom_bar(stat = "identity")+
+    geom_hline(yintercept=seq(1,700000,100000), col="white", lwd=1)+
+  theme_classic()+
+  coord_flip()+
+  xlab("Industry")+
+  ggtitle("NY Industry Revenue per Employee")
+```
+```{r, echo=FALSE}
+q3_total <- inc%>%
+  filter(complete.cases(.))%>%
+  group_by(Industry)%>%
+  summarise(Revenue_total = sum(Revenue), Employees_Total= sum(Employees))%>%
+  mutate(Revenue_per_employee = Revenue_total/Employees_Total)
+
+ggplot(q3_total, aes(x=reorder(Industry, Revenue_per_employee), y=Revenue_per_employee))+
+  geom_bar(stat = "identity")+
+  geom_hline(yintercept=seq(1,1250000,100000), col="white", lwd=1)+
+  theme_classic()+
+  coord_flip()+
+  xlab("Industry")+
+  ggtitle("Country Industry Revenue per Employee")
 
 ```
 
